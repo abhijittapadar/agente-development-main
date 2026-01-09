@@ -1,0 +1,58 @@
+pipeline {
+    agent {
+        label 'Development'  // This will run on Ubuntu agent
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                // This checkout happens on the Ubuntu agent
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/abhijittapadar/agente-development-main.git'
+                        // Add credentialsId if needed
+                    ]]
+                ])
+                // Verify checkout
+                sh 'ls -la'
+                sh 'pwd'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo "Building ... in the node ${NODE_NAME}"
+                sh 'uname -n'
+                sh 'ls -la'  // Should show your repo files
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo "Testing ... in the node ${NODE_NAME}"
+                sh 'uname -n'
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo "Deploying ... in the node ${NODE_NAME}"
+                sh 'uname -n'
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'This will always run'
+        }
+        success {
+            echo 'This will run only if the pipeline succeeds'
+        }
+        failure {
+            echo 'This will run only if the pipeline fails'
+        }
+    }
+}
