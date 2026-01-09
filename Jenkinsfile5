@@ -1,0 +1,75 @@
+// Jenkinsfile-simple-test
+pipeline {
+    agent {
+        label 'ubuntu docker linux'
+    }
+    
+    stages {
+        stage('Test Connection') {
+            steps {
+                script {
+                    echo "Testing connection to Ubuntu Docker Agent..."
+                    echo "SSH Port: 2222 (mapped to container port 22)"
+                    echo "Java Path: /usr/bin/java"
+                    echo "Workspace: /home/jenkins"
+                    
+                    sh '''
+                        # Verify we're on Ubuntu
+                        echo "OS: $(cat /etc/os-release | grep PRETTY_NAME)"
+                        echo "Kernel: $(uname -r)"
+                        echo ""
+                        
+                        # Verify Java
+                        echo "Java location: $(which java)"
+                        echo "Java version:"
+                        java -version
+                        echo ""
+                        
+                        # Verify we're in correct workspace
+                        echo "Current directory: $(pwd)"
+                        echo "Should be: /home/jenkins/workspace"
+                        echo ""
+                        
+                        # Create test file
+                        echo "Agent test successful!" > agent-test.txt
+                        echo "Timestamp: $(date)" >> agent-test.txt
+                        echo "Build: ${BUILD_NUMBER}" >> agent-test.txt
+                        
+                        cat agent-test.txt
+                    '''
+                }
+            }
+        }
+        
+        stage('Git SCM Test') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: 'main']],
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/your-username/test-repo.git',
+                        credentialsId: 'your-git-creds'
+                    ]]
+                )
+                
+                sh '''
+                    echo "SCM Test Results:"
+                    echo "Repository contents:"
+                    ls -la
+                    
+                    if [ -f "README.md" ]; then
+                        echo "README.md found:"
+                        head -10 README.md
+                    fi
+                '''
+            }
+        }
+    }
+    
+    post {
+        always {
+            archiveArtifacts artifacts: 'agent-test.txt', fingerprint: true
+            echo "Test completed on Ubuntu agent!"
+        }
+    }
+}
