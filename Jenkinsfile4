@@ -1,0 +1,44 @@
+pipeline {
+    agent {
+        label 'Prodcution'  // Make sure this matches your node label exactly
+    }
+    
+    tools {
+        // Specify which Git installation to use
+        // This should match a Git installation configured for Linux
+        git 'Linux-Git'  // or 'Default' if configured for Linux
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Running on node: ${NODE_NAME}"
+                    echo "Workspace: ${WORKSPACE}"
+                    
+                    // Test git availability
+                    sh 'which git'
+                    sh 'git --version'
+                }
+                
+                // Checkout code
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/abhijittapadar/agente-development-main.git'
+                        // Add credentialsId if needed: credentialsId: 'your-git-creds'
+                    ]],
+                    extensions: [[$class: 'CleanBeforeCheckout']]
+                ])
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo "Building ... on node: ${NODE_NAME}"
+                sh 'ls -la'
+            }
+        }
+    }
+}
