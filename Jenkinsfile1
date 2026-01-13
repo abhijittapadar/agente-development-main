@@ -1,10 +1,6 @@
 pipeline {
    
-    agent{
-        
-          label 'dev && ubuntu'
-        
-    }
+    agent any
     stages {
         stage('Build') {
             steps {
