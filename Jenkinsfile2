@@ -13,6 +13,26 @@ pipeline {
                 sh 'uname -n'
             }
         }
+         stage('Build') {
+            agent{
+                label 'ubuntu'
+            }
+            steps {
+            
+                echo "Building ... in the node ${NODE_NAME}  and in the executor ${EXECUTOR_NUMBER}"
+                sh 'uname -n'
+            }
+        }
+         stage('Build') {
+            agent{
+                label 'prod'
+            }
+            steps {
+            
+                echo "Building ... in the node ${NODE_NAME}  and in the executor ${EXECUTOR_NUMBER}"
+                sh 'uname -n'
+            }
+        }
         stage('Test') {
             agent{
                 label 'ubuntu'
