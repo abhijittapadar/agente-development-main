@@ -41,30 +41,7 @@ pipeline {
             }
         }
         
-        stage('Git SCM Test') {
-            steps {
-                checkout scmGit(
-                    branches: [[name: 'main']],
-                    extensions: [],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/your-username/test-repo.git',
-                        credentialsId: 'your-git-creds'
-                    ]]
-                )
-                
-                sh '''
-                    echo "SCM Test Results:"
-                    echo "Repository contents:"
-                    ls -la
-                    
-                    if [ -f "README.md" ]; then
-                        echo "README.md found:"
-                        head -10 README.md
-                    fi
-                '''
-            }
-        }
-    }
+        
     
     post {
         always {
@@ -74,3 +51,4 @@ pipeline {
     }
 
 }
+
