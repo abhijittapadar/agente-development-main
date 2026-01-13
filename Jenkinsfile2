@@ -13,7 +13,7 @@ pipeline {
                 sh 'uname -n'
             }
         }
-         stage('Build') {
+         stage('Build1') {
             agent{
                 label 'ubuntu'
             }
