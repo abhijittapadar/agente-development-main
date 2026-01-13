@@ -2,7 +2,7 @@ pipeline {
    
     agent{
         
-          label 'ubuntu  &&  dev'
+          label 'ubuntu' 'dev'
         
     }
     stages {
