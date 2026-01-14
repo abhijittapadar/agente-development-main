@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent{
+        node {
+            label 'dev'
+        }
+    }
     
     stages {
         stage('Check Container Environment') {
@@ -219,3 +223,4 @@ pipeline {
         }
     }
 }
+
