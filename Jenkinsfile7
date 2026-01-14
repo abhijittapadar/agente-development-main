@@ -10,7 +10,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Installing Apache HTTPD..."
-                    yum install -y httpd || apt-get install -y apache2
+                    apt install -y httpd || apt install -y apache2
                 '''
             }
         }
@@ -41,7 +41,7 @@ pipeline {
                     
                     # Install curl if not present
                     if ! command -v curl &> /dev/null; then
-                        yum install -y curl || apt-get install -y curl
+                        apt install -y curl || apt install -y curl
                     fi
                     
                     # Test if server is responding
@@ -62,3 +62,4 @@ pipeline {
         }
     }
 }
+
