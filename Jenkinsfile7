@@ -25,12 +25,12 @@ pipeline {
                     sh '''
                         # Install curl for HTTP testing
                         if ! command -v curl &> /dev/null; then
-                            sudo apt-get update && sudo apt-get install -y curl
+                            apt-get update && sudo apt-get install -y curl
                         fi
                         
                         # Install Apache Bench if not present
                         if ! command -v ab &> /dev/null; then
-                            sudo apt-get install -y apache2-utils
+                            apt-get install -y apache2-utils
                         fi
                     '''
                 }
@@ -141,4 +141,5 @@ pipeline {
             // )
         }
     }
+
 }
