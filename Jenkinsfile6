@@ -1,0 +1,160 @@
+pipeline {
+    agent none
+    
+    parameters {
+        choice(
+            name: 'DEPLOY_ENV',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Select deployment environment'
+        )
+        booleanParam(
+            name: 'CLEAN_WORKSPACE',
+            defaultValue: false,
+            description: 'Clean workspace before execution'
+        )
+    }
+    
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+    
+    stages {
+        stage('Pre-Cleanup') {
+            when {
+                expression { params.CLEAN_WORKSPACE }
+            }
+            steps {
+                script {
+                    echo "Cleaning workspace..."
+                    cleanWs()
+                }
+            }
+        }
+        
+        stage('Checkout Code') {
+            agent {
+                label 'master'  // Run on Jenkins controller
+            }
+            steps {
+                checkout scm
+                script {
+                    echo "Repository URL: ${scm.userRemoteConfigs[0].url}"
+                    echo "Branch: ${env.BRANCH_NAME}"
+                }
+            }
+        }
+        
+        stage('Parallel Deployments') {
+            failFast false
+            parallel {
+                stage('Deploy HTTPD Website') {
+                    agent {
+                        label 'httpd-agent'  // Your agent with label 'httpd-agent'
+                    }
+                    steps {
+                        script {
+                            echo "Running on agent: ${env.NODE_NAME}"
+                            echo "Building HTTPD Website on port ${env.HTTP_PORT ?: '8080'}"
+                            
+                            // Check if docker is available
+                            sh '''
+                                echo "Current directory: $(pwd)"
+                                echo "Java version:"
+                                java -version 2>&1 || echo "Java not found"
+                                echo "Docker info:"
+                                docker --version 2>&1 || echo "Docker not found"
+                            '''
+                            
+                            // Create simple HTML file
+                            writeFile file: 'index.html', text: '''
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <title>HTTPD Test Site - ${DEPLOY_ENV}</title>
+                                <style>
+                                    body { font-family: Arial, sans-serif; margin: 40px; }
+                                    .container { max-width: 800px; margin: 0 auto; }
+                                    .header { background: #4CAF50; color: white; padding: 20px; }
+                                    .content { padding: 20px; border: 1px solid #ddd; }
+                                    .info { background: #f9f9f9; padding: 10px; margin: 10px 0; }
+                                </style>
+                            </head>
+                            <body>
+                                <div class="container">
+                                    <div class="header">
+                                        <h1>HTTPD Website</h1>
+                                        <p>Deployed via Jenkins Pipeline</p>
+                                    </div>
+                                    <div class="content">
+                                        <h2>Environment: ${DEPLOY_ENV}</h2>
+                                        <div class="info">
+                                            <p><strong>Build Information:</strong></p>
+                                            <ul>
+                                                <li>Build Number: ${BUILD_NUMBER}</li>
+                                                <li>Build ID: ${BUILD_ID}</li>
+                                                <li>Node: ${NODE_NAME}</li>
+                                                <li>Job: ${JOB_NAME}</li>
+                                            </ul>
+                                        </div>
+                                        <p>This is a test website served by HTTPD/Apache.</p>
+                                        <p>Current time: <span id="datetime"></span></p>
+                                        <script>
+                                            var dt = new Date();
+                                            document.getElementById("datetime").innerHTML = dt.toLocaleString();
+                                        </script>
+                                    </div>
+                                </div>
+                            </body>
+                            </html>
+                            '''.replace('${DEPLOY_ENV}', params.DEPLOY_ENV)
+                            
+                            // Create Dockerfile for HTTPD
+                            writeFile file: 'Dockerfile.httpd', text: '''
+                            FROM httpd:2.4-alpine
+                            COPY index.html /usr/local/apache2/htdocs/
+                            EXPOSE 80
+                            CMD ["httpd-foreground"]
+                            '''
+                            
+                            // Build and run HTTPD container
+                            sh '''
+                                echo "Building HTTPD Docker image..."
+                                docker build -f Dockerfile.httpd -t jenkins-httpd-test:${BUILD_NUMBER} .
+                                
+                                echo "Stopping any existing container..."
+                                docker stop jenkins-httpd-${BUILD_NUMBER} 2>/dev/null || true
+                                docker rm jenkins-httpd-${BUILD_NUMBER} 2>/dev/null || true
+                                
+                                echo "Starting new HTTPD container..."
+                                docker run -d --name jenkins-httpd-${BUILD_NUMBER} -p 8080:80 jenkins-httpd-test:${BUILD_NUMBER}
+                                
+                                echo "Container status:"
+                                docker ps | grep jenkins-httpd
+                                
+                                echo "Testing HTTPD service..."
+                                sleep 5
+                                curl -f http://localhost:8080/ || echo "HTTPD service check failed"
+                            '''
+                            
+                            // Archive artifacts
+                            archiveArtifacts artifacts: 'index.html', fingerprint: true
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                echo "Cleaning up HTTPD containers..."
+                                sh '''
+                                    docker stop jenkins-httpd-${BUILD_NUMBER} 2>/dev/null || true
+                                    docker rm jenkins-httpd-${BUILD_NUMBER} 2>/dev/null || true
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
