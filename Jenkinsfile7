@@ -29,11 +29,11 @@ pipeline {
                         echo "Debian/Ubuntu based container detected"
                         
                         # Update package lists
-                        apt-get update 2>/dev/null || echo "Cannot update packages - need root"
+                        sudo apt-get update 2>/dev/null || echo "Cannot update packages - need root"
                         
                         # Try to install Apache (may fail without root)
                         echo "Trying to install Apache..."
-                        if apt-get install -y apache2 2>/dev/null; then
+                        if sudo apt-get install -y apache2 2>/dev/null; then
                             echo "Apache installed successfully!"
                         else
                             echo "Cannot install Apache - need root privileges"
@@ -165,4 +165,5 @@ EOF
         }
     }
 }
+
 
