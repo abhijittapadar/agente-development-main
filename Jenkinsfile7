@@ -1,0 +1,144 @@
+pipeline {
+    agent{
+        node {
+            label 'dev'
+        }
+    }
+    
+    parameters {
+        string(name: 'SERVER_URL', defaultValue: 'http://localhost:80', description: 'URL of the web server to test')
+        string(name: 'TEST_PATH', defaultValue: '/index.html', description: 'Test endpoint path')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+        
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    echo 'Installing required tools...'
+                    sh '''
+                        # Install curl for HTTP testing
+                        if ! command -v curl &> /dev/null; then
+                            sudo apt-get update && sudo apt-get install -y curl
+                        fi
+                        
+                        # Install Apache Bench if not present
+                        if ! command -v ab &> /dev/null; then
+                            sudo apt-get install -y apache2-utils
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Server Connectivity Test') {
+            steps {
+                script {
+                    echo "Testing connectivity to ${params.SERVER_URL}..."
+                    
+                    // Test basic connectivity
+                    def response = sh(
+                        script: "curl -s -o /dev/null -w '%{http_code}' ${params.SERVER_URL}${params.TEST_PATH} || echo '000'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (response == "200") {
+                        echo "✓ Server is responding with HTTP 200"
+                    } else {
+                        error "✗ Server returned HTTP ${response}"
+                    }
+                }
+            }
+        }
+        
+        stage('Response Time Test') {
+            steps {
+                script {
+                    echo "Testing response time..."
+                    
+                    sh """
+                        echo "Testing response time for ${params.SERVER_URL}"
+                        curl -s -o /dev/null -w 'Response Time: %{time_total}s\\n' ${params.SERVER_URL}${params.TEST_PATH}
+                    """
+                }
+            }
+        }
+        
+        stage('Load Test (Optional)') {
+            when {
+                expression { env.RUN_LOAD_TEST == 'true' }
+            }
+            steps {
+                script {
+                    echo "Running basic load test..."
+                    
+                    sh """
+                        echo "Running Apache Bench test..."
+                        ab -n 100 -c 10 ${params.SERVER_URL}${params.TEST_PATH} || true
+                    """
+                }
+            }
+        }
+        
+        stage('Content Validation') {
+            steps {
+                script {
+                    echo "Validating response content..."
+                    
+                    // Check if response contains expected content
+                    sh """
+                        if curl -s ${params.SERVER_URL}${params.TEST_PATH} | grep -q "html"; then
+                            echo "✓ HTML content detected"
+                        else
+                            echo "⚠ No HTML content found in response"
+                        fi
+                    """
+                }
+            }
+        }
+        
+        stage('Security Headers Check') {
+            steps {
+                script {
+                    echo "Checking security headers..."
+                    
+                    sh """
+                        echo "Security Headers Analysis:"
+                        curl -s -I ${params.SERVER_URL} | grep -E "(X-Content-Type-Options|X-Frame-Options|X-XSS-Protection|Content-Security-Policy)" || echo "No security headers found"
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Cleaning up test artifacts...'
+            cleanWs()
+        }
+        success {
+            echo '✅ HTTPD Web Server tests passed!'
+            // Optional: Send notification
+            // emailext (
+            //     subject: "✅ Web Server Test Passed: ${env.JOB_NAME}",
+            //     body: "All tests passed successfully.",
+            //     to: 'team@example.com'
+            // )
+        }
+        failure {
+            echo '❌ HTTPD Web Server tests failed!'
+            // Optional: Send notification
+            // emailext (
+            //     subject: "❌ Web Server Test Failed: ${env.JOB_NAME}",
+            //     body: "Tests failed. Please check the logs.",
+            //     to: 'team@example.com'
+            // )
+        }
+    }
+}
