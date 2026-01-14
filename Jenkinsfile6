@@ -51,7 +51,7 @@ pipeline {
             parallel {
                 stage('Deploy HTTPD Website') {
                     agent {
-                        label 'dev'  // Your agent with label 'httpd-agent'
+                        label 'ubuntu'  // Your agent with label 'httpd-agent'
                     }
                     steps {
                         script {
@@ -159,3 +159,4 @@ pipeline {
     }
 
 }
+
