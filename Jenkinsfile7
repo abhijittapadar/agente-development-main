@@ -1,153 +1,99 @@
 pipeline {
-    agent{
-        node {
-            label 'dev'
-        }
-    }
+    agent any
     
     stages {
-        stage('Check Container Environment') {
+        stage('Check Environment') {
             steps {
                 sh '''
-                    echo "=== Container Environment ==="
-                    echo "Running in container: $(hostname)"
-                    echo "User: $(whoami) (UID: $(id -u))"
-                    echo "Home: $HOME"
-                    echo "OS: $(cat /etc/os-release 2>/dev/null | grep PRETTY_NAME || uname -a)"
-                    echo "============================="
+                    echo "=== Environment Check ==="
+                    echo "Container: $(hostname)"
+                    echo "User: $(whoami)"
+                    echo "Python available: $(command -v python3 || echo 'No')"
                 '''
             }
         }
         
-        stage('Try to Install Apache') {
+        stage('Create Web Content') {
             steps {
                 sh '''
-                    echo "Attempting to install Apache HTTP server..."
+                    echo "Creating web content..."
                     
-                    # Check if we're in a Debian/Ubuntu container
-                    if [ -f /etc/debian_version ]; then
-                        echo "Debian/Ubuntu based container detected"
-                        
-                        # Update package lists
-                        sudo apt-get update 2>/dev/null || echo "Cannot update packages - need root"
-                        
-                        # Try to install Apache (may fail without root)
-                        echo "Trying to install Apache..."
-                        if sudo apt-get install -y apache2 2>/dev/null; then
-                            echo "Apache installed successfully!"
-                        else
-                            echo "Cannot install Apache - need root privileges"
-                            echo "Will try alternative methods..."
-                        fi
-                    else
-                        echo "Non-Debian container detected"
-                    fi
+                    # Create simple HTML file
+                    mkdir -p $WORKSPACE/web
+                    
+                    cat > $WORKSPACE/web/index.html << 'HTML'
+                    <html>
+                    <head><title>Jenkins Test</title></head>
+                    <body>
+                        <h1>✅ Jenkins Web Server Test</h1>
+                        <h2>Success!</h2>
+                        <p>Running without sudo or Apache</p>
+                        <p>Build: ${BUILD_NUMBER}</p>
+                        <p>Time: $(date)</p>
+                    </body>
+                    </html>
+                    HTML
+                    
+                    echo "Created: $WORKSPACE/web/index.html"
                 '''
             }
         }
         
-        stage('Create Test Web Page') {
+        stage('Start Web Server') {
             steps {
+                script {
+                    // Try different ports until we find one available
+                    def port = sh(
+                        script: '''
+                            for p in 8000 8001 8002 9000 9001 9999; do
+                                if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/\$p" 2>/dev/null; then
+                                    echo \$p
+                                    break
+                                fi
+                            done
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (!port) {
+                        port = "8000"
+                    }
+                    
+                    env.WEB_PORT = port
+                }
+                
                 sh '''
-                    echo "Creating test web page..."
+                    echo "Starting web server on port ${WEB_PORT}..."
                     
-                    # Create web directory in workspace
-                    mkdir -p $WORKSPACE/www
+                    # Start Python server
+                    cd $WORKSPACE/web
+                    python3 -m http.server ${WEB_PORT} &
                     
-                    # Create HTML file
-                    cat > $WORKSPACE/www/index.html << EOF
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Jenkins Container Test</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .success { color: #28a745; }
-        .info { color: #17a2b8; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1 class="success">✅ Jenkins Container Web Test</h1>
-        <h2>Container Information</h2>
-        <ul>
-            <li><strong>Container ID:</strong> $(hostname)</li>
-            <li><strong>User:</strong> $(whoami)</li>
-            <li><strong>UID/GID:</strong> $(id -u)/$(id -g)</li>
-        </ul>
-        
-        <h2>Build Information</h2>
-        <ul>
-            <li><strong>Job:</strong> ${JOB_NAME}</li>
-            <li><strong>Build Number:</strong> ${BUILD_NUMBER}</li>
-            <li><strong>Build Time:</strong> $(date)</li>
-        </ul>
-        
-        <div class="info">
-            <h3>Note:</h3>
-            <p>Running in Docker container without sudo privileges.</p>
-        </div>
-    </div>
-</body>
-</html>
-EOF
+                    # Save PID
+                    echo $! > $WORKSPACE/server.pid
                     
-                    echo "Test page created at: $WORKSPACE/www/index.html"
+                    # Wait for server to start
+                    sleep 3
+                    
+                    echo "Server started on http://localhost:${WEB_PORT}"
                 '''
             }
         }
         
-        stage('Test Web Server') {
+        stage('Test Connection') {
             steps {
                 sh '''
                     echo "Testing web server..."
                     
-                    # Method 1: Check if Apache is running
-                    echo "=== Checking for Apache ==="
-                    if which apache2 > /dev/null 2>&1; then
-                        echo "Apache is installed at: $(which apache2)"
-                        echo "Checking if running on port 80..."
-                        
-                        # Check port 80
-                        if timeout 2 bash -c "echo > /dev/tcp/localhost/80" 2>/dev/null; then
-                            echo "Port 80 is open"
-                            curl -s http://localhost | head -5
-                        else
-                            echo "Port 80 is not open"
-                        fi
+                    # Test if server is responding
+                    if curl -s http://localhost:${WEB_PORT} > /dev/null; then
+                        echo "✅ SUCCESS: Web server is working!"
+                        echo "Page title:"
+                        curl -s http://localhost:${WEB_PORT} | grep -o "<title>.*</title>"
                     else
-                        echo "Apache is not installed"
-                    fi
-                    
-                    # Method 2: Start Python web server
-                    echo ""
-                    echo "=== Starting Python Web Server ==="
-                    
-                    if command -v python3 > /dev/null; then
-                        echo "Python3 is available"
-                        
-                        # Start Python server
-                        cd $WORKSPACE/www
-                        python3 -m http.server 8080 > /tmp/python-server.log 2>&1 &
-                        SERVER_PID=$!
-                        
-                        sleep 2
-                        
-                        # Test the server
-                        if curl -s http://localhost:8080 > /dev/null; then
-                            echo "Python web server is working on port 8080"
-                            echo "Test URL: http://localhost:8080"
-                            echo "Response preview:"
-                            curl -s http://localhost:8080 | grep -o "<title>.*</title>"
-                        else
-                            echo "Python server is not responding"
-                        fi
-                        
-                        # Kill the server
-                        kill $SERVER_PID 2>/dev/null || true
-                    else
-                        echo "Python3 is not available"
+                        echo "❌ FAILED: Cannot connect to web server"
+                        echo "Checking server process..."
+                        ps aux | grep "http.server" | grep -v grep || echo "No server process found"
                     fi
                 '''
             }
@@ -156,14 +102,15 @@ EOF
     
     post {
         always {
-            echo "Build completed"
             sh '''
                 echo "Cleaning up..."
-                # Kill any remaining Python servers
+                if [ -f $WORKSPACE/server.pid ]; then
+                    kill $(cat $WORKSPACE/server.pid) 2>/dev/null || true
+                    rm -f $WORKSPACE/server.pid
+                fi
                 pkill -f "http.server" 2>/dev/null || true
             '''
+            echo "Test completed"
         }
     }
 }
-
-
