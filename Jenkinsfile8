@@ -1,0 +1,42 @@
+pipeline {
+    agent{
+        node {
+            label 'dev'
+        }
+    }
+    
+    
+    stages {
+        stage('Debug Information') {
+            steps {
+                sh '''
+                    echo "=== DEBUG INFORMATION ==="
+                    echo "1. Current user: $(whoami)"
+                    echo "2. User ID: $(id -u)"
+                    echo "3. Group ID: $(id -g)"
+                    echo "4. Groups: $(groups)"
+                    echo "5. Home directory: $HOME"
+                    echo "6. Working directory: $PWD"
+                    echo "7. Hostname: $(hostname)"
+                    echo ""
+                    echo "=== SUDO CHECK ==="
+                    echo "8. sudo command exists: $(which sudo || echo 'NOT FOUND')"
+                    echo "9. sudo version: $(sudo --version 2>/dev/null | head -1 || echo 'Cannot run sudo')"
+                    echo "10. Can run sudo? $(sudo -n true 2>&1 | grep -v 'password' || echo 'No sudo access')"
+                    echo ""
+                    echo "=== APACHE CHECK ==="
+                    echo "11. Apache installed? $(which apache2 2>/dev/null || which httpd 2>/dev/null || echo 'NOT INSTALLED')"
+                    echo "12. Apache version: $(apache2 -v 2>/dev/null | head -1 || httpd -v 2>/dev/null | head -1 || echo 'Cannot check')"
+                    echo "13. Apache running? $(ps aux | grep -E '(apache|httpd)' | grep -v grep | wc -l) processes"
+                    echo ""
+                    echo "=== FILE PERMISSIONS ==="
+                    echo "14. Can write to /tmp? $(touch /tmp/test_jenkins_$(whoami) && echo 'YES' || echo 'NO'; rm -f /tmp/test_jenkins_$(whoami) 2>/dev/null)"
+                    echo "15. Can read /etc/passwd? $(cat /etc/passwd 2>/dev/null | head -1 | wc -l | xargs test 1 -eq && echo 'YES' || echo 'NO')"
+                    echo "16. Jenkins workspace: $WORKSPACE"
+                    echo "17. Workspace owner: $(ls -ld $WORKSPACE 2>/dev/null | awk '{print $3}')"
+                    echo "=== END DEBUG ==="
+                '''
+            }
+        }
+    }
+}
