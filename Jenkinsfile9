@@ -41,9 +41,9 @@ pipeline {
         stage('HTTPD installation....') {
             steps {
                 sh '''
-                    apt update
-                    apt install -y apache2
-                    apachectl -D FOREGROUND
+                    sudo apt update
+                    sudo apt install -y apache2
+                    sudo apachectl -D FOREGROUND
                 '''
             }
         }
@@ -51,3 +51,4 @@ pipeline {
 
 
 }
+
