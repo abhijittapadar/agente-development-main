@@ -38,8 +38,6 @@ pipeline {
                 '''
             }
         }
-    }
-    stages {
         stage('HTTPD installation....') {
             steps {
                 sh '''
@@ -50,5 +48,6 @@ pipeline {
             }
         }
     }
+
 
 }
