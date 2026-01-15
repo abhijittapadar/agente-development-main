@@ -41,6 +41,7 @@ pipeline {
         stage('HTTPD installation....') {
             steps {
                 sh '''
+                    sudo -i
                     apt update
                     apt install nginx -y
                     nginx -v
@@ -53,3 +54,4 @@ pipeline {
 
 
 }
+
