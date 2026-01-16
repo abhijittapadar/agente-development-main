@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Start Nginx') {
+            steps {
+                script {
+                    // Check if nginx is installed
+                    def isInstalled = sh(
+                        script: 'which nginx || echo "not_installed"',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (isInstalled == "not_installed") {
+                        echo "Nginx is not installed. Installing..."
+                        sh '''
+                            # Install nginx based on OS
+                            if [ -f /etc/redhat-release ]; then
+                                sudo yum install -y nginx
+                            elif [ -f /etc/debian_version ]; then
+                                sudo apt-get update
+                                sudo apt-get install -y nginx
+                            else
+                                echo "Unsupported OS"
+                                exit 1
+                            fi
+                        '''
+                    }
+                    
+                    // Start nginx service
+                    sh '''
+                        # Start nginx
+                        sudo systemctl start nginx || sudo service nginx start
+                        
+                        # Enable on boot
+                        sudo systemctl enable nginx || sudo update-rc.d nginx defaults
+                        
+                        # Check status
+                        sudo systemctl status nginx --no-pager || sudo service nginx status
+                    '''
+                    
+                    // Verify nginx is running
+                    sh 'curl -s -o /dev/null -w "%{http_code}" http://localhost || true'
+                }
+            }
+        }
+        
+        stage('Verify') {
+            steps {
+                sh '''
+                    # Check if nginx process is running
+                    ps aux | grep nginx | grep -v grep || echo "Nginx process not found"
+                    
+                    # Check if port 80 is listening
+                    sudo netstat -tlnp | grep :80 || sudo ss -tlnp | grep :80 || echo "Port 80 not listening"
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Nginx server started successfully!'
+        }
+        failure {
+            echo 'Failed to start nginx server'
+        }
+    }
+}
