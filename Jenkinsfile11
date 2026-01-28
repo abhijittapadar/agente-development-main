@@ -1,7 +1,7 @@
 pipeline {
     agent{
         node {
-            label 'nginx'
+            label 'prod'
         }
     }
     
@@ -72,3 +72,4 @@ pipeline {
     }
 
 }
+
