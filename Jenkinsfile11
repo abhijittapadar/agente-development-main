@@ -22,7 +22,7 @@ pipeline {
                             if [ -f /etc/redhat-release ]; then
                                 sudo yum install -y nginx
                             elif [ -f /etc/debian_version ]; then
-                                apt-get update
+                                apt-get -y update
                                 apt-get install -y nginx
                             else
                                 echo "Unsupported OS"
@@ -72,4 +72,5 @@ pipeline {
     }
 
 }
+
 
