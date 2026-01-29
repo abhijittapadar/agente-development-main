@@ -33,10 +33,10 @@ pipeline {
                     
                     // Start nginx service
                     sh '''
-                        sudo systemctl start apache2
-                        sudo systemctl enable apache2
+                        sudo service start apache2
+                        sudo service enable apache2
                         # Check status
-                        sudo systemctl status apache2
+                        sudo service status apache2
                     '''
                     
                     // Verify nginx is running
@@ -68,3 +68,4 @@ pipeline {
     }
 
 }
+
