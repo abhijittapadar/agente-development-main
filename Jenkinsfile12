@@ -24,6 +24,10 @@ pipeline {
                             elif [ -f /etc/debian_version ]; then
                                 sudo apt-get update
                                 sudo apt-get install -y apache2
+                                sudo mkdir -p /var/run/apache2
+                                sudo chown www-data:www-data /var/run/apache2
+                                sudo chmod 755 /var/run/apache2
+                                sudo apachectl -D FOREGROUND
                             else
                                 echo "Unsupported OS"
                                 exit 1
@@ -32,12 +36,7 @@ pipeline {
                     }
                     
                     // Start nginx service
-                    sh '''
-                        sudo service start apache2
-                        sudo service enable apache2
-                        # Check status
-                        sudo service status apache2
-                    '''
+                    
                     
                     // Verify nginx is running
                     sh 'curl -s -o /dev/null -w "%{http_code}" http://localhost || true'
@@ -68,4 +67,5 @@ pipeline {
     }
 
 }
+
 
