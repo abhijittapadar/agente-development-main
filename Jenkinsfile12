@@ -1,0 +1,69 @@
+pipeline {
+    agent{
+        node {
+            label 'edge'
+        }
+    }
+    
+    stages {
+        stage('Start Apache2 HTTPD installation....') {
+            steps {
+                script {
+                    // Check if nginx is installed
+                    def isInstalled = sh(
+                        script: 'which httpd || echo "not_installed"',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (isInstalled == "not_installed") {
+                        echo "httpd is not installed. Installing..."
+                        sh '''
+                            # Install httpd based on OS
+                            if [ -f /etc/redhat-release ]; then
+                                sudo yum install -y apache2
+                            elif [ -f /etc/debian_version ]; then
+                                sudo apt-get update
+                                sudo apt-get install -y apache2
+                                apachectl -D FOREGROUND
+                            else
+                                echo "Unsupported OS"
+                                exit 1
+                            fi
+                        '''
+                    }
+                    
+                    // Start nginx service
+                    sh '''
+                        
+                        # Check status
+                        sudo service apache2 status
+                    '''
+                    
+                    // Verify nginx is running
+                    sh 'curl -s -o /dev/null -w "%{http_code}" http://localhost || true'
+                }
+            }
+        }
+        
+        stage('Verify') {
+            steps {
+                sh '''
+                    # Check if nginx process is running
+                    ps aux | grep apache2 || echo "Apachee2 process not found"
+                    
+                    # Check if port 80 is listening
+                    sudo netstat -tlnp | grep :80 || sudo ss -tlnp | grep :80 || echo "Port 80 not listening"
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Apachee2 server started successfully!'
+        }
+        failure {
+            echo 'Failed to start nginx server'
+        }
+    }
+}
