@@ -1,7 +1,7 @@
 pipeline {
     agent{
         node {
-            label 'edge'
+            label 'edge1'
         }
     }
     
@@ -67,5 +67,6 @@ pipeline {
     }
 
 }
+
 
 
